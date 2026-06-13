@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Star, Calendar, MessageSquare, Award, CheckCircle2, ChevronLeft, MapPin } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { ShieldCheck, Star, Calendar, MessageSquare, Award, CheckCircle2, ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
 import type { Worker, Review } from '../data/mockData';
 import { api } from '../data/api';
 
@@ -16,9 +16,35 @@ export const WorkerProfilePage: React.FC<WorkerProfilePageProps> = ({
   onNavigate,
   onShowToast
 }) => {
-  const [selectedDate, setSelectedDate] = useState<string>(worker?.calendarSlots?.[0] || '');
+  // Compute available future/fallback slots
+  const availableSlots = useMemo(() => {
+    const slots = worker?.calendarSlots || [];
+    const todayStr = new Date().toISOString().split('T')[0];
+    const futureSlots = slots.filter(s => s >= todayStr);
+    if (futureSlots.length > 0) {
+      return futureSlots;
+    }
+    // Fallback: next 7 days starting tomorrow
+    const generated = [];
+    for (let i = 1; i <= 7; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      generated.push(d.toISOString().split('T')[0]);
+    }
+    return generated;
+  }, [worker]);
+
+  const [selectedDate, setSelectedDate] = useState<string>(availableSlots[0] || '');
   const [activeTab, setActiveTab] = useState<'about' | 'reviews'>('about');
   const [reviews, setReviews] = useState<Review[]>(worker?.reviews || []);
+
+  // Calendar month/year navigation state
+  const [calendarDate, setCalendarDate] = useState(() => {
+    if (availableSlots.length > 0) {
+      return new Date(availableSlots[0]);
+    }
+    return new Date();
+  });
 
   useEffect(() => {
     if (worker && worker.id) {
@@ -245,36 +271,108 @@ export const WorkerProfilePage: React.FC<WorkerProfilePageProps> = ({
               </h3>
               
               <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-                Choose an available calendar day slots for booking:
+                Choose an available calendar day (highlighted) for booking:
               </p>
 
-              {/* Slot grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', marginBottom: '1.5rem' }}>
-                {worker.calendarSlots?.map((slot) => {
-                  const dateObj = new Date(slot);
-                  const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' });
-                  
-                  return (
-                    <button
-                      key={slot}
-                      onClick={() => setSelectedDate(slot)}
-                      style={{
-                        padding: '0.65rem 0.5rem',
-                        fontSize: '0.8rem',
-                        borderRadius: 'var(--radius-sm)',
-                        border: '1px solid',
-                        borderColor: selectedDate === slot ? 'var(--primary)' : 'var(--border-color)',
-                        backgroundColor: selectedDate === slot ? 'var(--primary-soft)' : 'var(--bg-primary)',
-                        color: selectedDate === slot ? 'var(--primary)' : 'var(--text-primary)',
-                        fontWeight: selectedDate === slot ? 700 : 500,
-                        transition: 'all var(--transition-fast)'
-                      }}
-                    >
-                      {formattedDate}
-                    </button>
-                  );
-                })}
-              </div>
+              {/* Monthly Navigation Header */}
+              {(() => {
+                const year = calendarDate.getFullYear();
+                const month = calendarDate.getMonth();
+                const totalDays = new Date(year, month + 1, 0).getDate();
+                const firstDayIndex = new Date(year, month, 1).getDay();
+                const monthName = calendarDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
+                const handlePrevMonth = () => {
+                  setCalendarDate(new Date(year, month - 1, 1));
+                };
+                const handleNextMonth = () => {
+                  setCalendarDate(new Date(year, month + 1, 1));
+                };
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                      <button 
+                        type="button"
+                        onClick={handlePrevMonth}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)', padding: '0.25rem' }}
+                      >
+                        <ChevronLeft style={{ width: '1.1rem' }} />
+                      </button>
+                      <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{monthName}</span>
+                      <button 
+                        type="button"
+                        onClick={handleNextMonth}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)', padding: '0.25rem' }}
+                      >
+                        <ChevronRight style={{ width: '1.1rem' }} />
+                      </button>
+                    </div>
+
+                    {/* Calendar grid headers */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.25rem', textAlign: 'center', fontWeight: 'bold', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => <div key={d}>{d}</div>)}
+                    </div>
+
+                    {/* Calendar grid cells */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.35rem', marginBottom: '1.25rem' }}>
+                      {Array.from({ length: firstDayIndex }).map((_, idx) => (
+                        <div key={`empty-${idx}`} />
+                      ))}
+                      {Array.from({ length: totalDays }, (_, i) => i + 1).map(dayNum => {
+                        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+                        const isAvailable = availableSlots.includes(dateStr);
+                        const isSelected = selectedDate === dateStr;
+
+                        return (
+                          <button
+                            key={dayNum}
+                            type="button"
+                            disabled={!isAvailable}
+                            onClick={() => setSelectedDate(dateStr)}
+                            style={{
+                              height: '2.1rem',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.8rem',
+                              borderRadius: 'var(--radius-sm)',
+                              border: isSelected ? '2px solid var(--primary)' : '1px solid transparent',
+                              backgroundColor: isSelected 
+                                ? 'var(--primary-soft)' 
+                                : isAvailable 
+                                  ? 'var(--secondary-soft)' 
+                                  : 'transparent',
+                              color: isSelected
+                                ? 'var(--primary)'
+                                : isAvailable
+                                  ? 'var(--secondary-hover)'
+                                  : 'var(--text-muted)',
+                              cursor: isAvailable ? 'pointer' : 'not-allowed',
+                              fontWeight: (isSelected || isAvailable) ? 'bold' : 'normal',
+                              transition: 'all var(--transition-fast)',
+                              position: 'relative'
+                            }}
+                          >
+                            {dayNum}
+                            {isAvailable && !isSelected && (
+                              <span style={{
+                                position: 'absolute',
+                                bottom: '2px',
+                                width: '4px',
+                                height: '4px',
+                                borderRadius: '50%',
+                                backgroundColor: 'var(--secondary)'
+                              }} />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Action buttons */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>

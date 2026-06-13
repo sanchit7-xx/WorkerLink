@@ -60,8 +60,8 @@ export const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ onShowToast, c
   const handleRejectBooking = async (booking: Booking) => {
     setLoadingAction(booking.id);
     try {
-      await api.updateBookingStatus(booking.id, 'Cancelled');
-      setAllBookings(prev => prev.map(b => b.id === booking.id ? { ...b, status: 'Cancelled' } : b));
+      await api.updateBookingStatus(booking.id, 'Declined');
+      setAllBookings(prev => prev.map(b => b.id === booking.id ? { ...b, status: 'Declined' } : b));
       onShowToast('Job Declined', `You declined the booking request.`, 'info');
     } catch (err) {
       console.error(err);

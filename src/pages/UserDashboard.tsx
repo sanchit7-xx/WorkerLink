@@ -30,11 +30,24 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
       .catch(err => console.error('Failed to fetch workers from MySQL:', err));
   }, []);
 
-  // Sample notifications list
+  // Dynamic notifications based on booking status
   const notifications = [
-    { id: 1, title: 'Booking Confirmed', message: 'Sarah Jenkins is scheduled for tomorrow at 2:00 PM.', time: '5m ago', unread: true },
-    { id: 2, title: 'Verification Update', message: 'Your payment profile was verified successfully.', time: '2h ago', unread: false },
-    { id: 3, title: 'Special Promo', message: 'Get 15% off senior care services this weekend.', time: '1d ago', unread: false }
+    ...bookings.filter(b => b.status === 'Declined').map(b => ({
+      id: `declined-${b.id}`,
+      title: 'Booking Declined ❌',
+      message: `${b.workerName} declined your booking request for ${b.date}. Your card authorization has been cancelled.`,
+      time: 'Just now',
+      unread: true
+    })),
+    ...bookings.filter(b => b.status === 'Confirmed').map(b => ({
+      id: `confirmed-${b.id}`,
+      title: 'Booking Confirmed ✅',
+      message: `${b.workerName} accepted your booking request for ${b.date} at ${b.time}.`,
+      time: 'Just now',
+      unread: true
+    })),
+    { id: 'promo-1', title: 'Verification Update', message: 'Your payment profile was verified successfully.', time: '2h ago', unread: false },
+    { id: 'promo-2', title: 'Special Promo', message: 'Get 15% off senior care services this weekend.', time: '1d ago', unread: false }
   ];
 
   const nearbyWorkers = workers.filter(w => w.distance <= 2 && w.availability === 'Available');
@@ -75,6 +88,49 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Declined Bookings Alert Banner */}
+        {bookings.filter(b => b.status === 'Declined').map(b => (
+          <div key={b.id} className="card animate-fade-in" style={{
+            background: 'linear-gradient(135deg, var(--danger-soft) 0%, rgba(239, 68, 68, 0.15) 100%)',
+            borderLeft: '5px solid var(--danger-light)',
+            color: 'var(--text-primary)',
+            padding: '1.25rem',
+            marginBottom: '2rem',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            borderRadius: 'var(--radius-md)',
+            textAlign: 'left'
+          }}>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--danger-light)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                ⚠️ Booking Declined by Worker
+              </div>
+              <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                Your booking request with <b>{b.workerName}</b> ({b.workerCategory}) for <b>{b.date}</b> was declined by the worker. No charge was made to your card.
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem', flexShrink: 0 }}>
+              <button 
+                onClick={() => onSelectWorker(b.workerId)} 
+                className="btn btn-sm btn-primary"
+                style={{ padding: '0.4rem 0.85rem', fontSize: '0.8rem' }}
+              >
+                Choose Another Worker
+              </button>
+              {onCancelBooking && (
+                <button 
+                  onClick={() => onCancelBooking(b.id)} 
+                  className="btn btn-sm btn-outline"
+                  style={{ padding: '0.4rem 0.85rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}
+                >
+                  Dismiss
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
 
         {/* Banner Row: Search + Emergency Trigger */}
         <div className="grid grid-cols-3" style={{ gap: '1.5rem', marginBottom: '2.5rem' }}>
@@ -248,9 +304,11 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                         booking.status === 'Completed' ? 'badge-secondary' : 
                         booking.status === 'Ongoing' ? 'badge-warning' : 
                         booking.status === 'Pending' ? 'badge-warning' :
-                        booking.status === 'Cancelled' ? 'badge-danger' : 'badge-gray'
+                        (booking.status === 'Cancelled' || booking.status === 'Declined') ? 'badge-danger' : 'badge-gray'
                       }`} style={{ textTransform: 'capitalize' }}>
-                        {booking.status === 'Pending' ? '⏳ Pending Approval' : booking.status}
+                        {booking.status === 'Pending' ? '⏳ Pending Approval' : 
+                         booking.status === 'Declined' ? '❌ Declined by Worker' : 
+                         booking.status === 'Cancelled' ? '❌ Cancelled' : booking.status}
                       </span>
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ID: {booking.id}</span>
                     </div>

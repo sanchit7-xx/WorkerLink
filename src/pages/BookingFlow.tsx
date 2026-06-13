@@ -55,7 +55,7 @@ export const BookingFlow: React.FC<BookingFlowProps> = ({
       date: selectedDate,
       time: time,
       duration: duration,
-      totalAmount: totalAmount,
+      totalAmount: Math.round(totalAmount),
       status: 'Pending',
       address: address
     };
@@ -173,29 +173,26 @@ export const BookingFlow: React.FC<BookingFlowProps> = ({
 
         {/* STEP 2: PAYMENT & SUMMARY */}
         {step === 2 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            
-            {/* Split layout: Form + pricing card */}
-            <form onSubmit={handlePaySubmit} className="card animate-fade-in" style={{ textAlign: 'left', padding: '2rem' }}>
-              <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color-light)', paddingBottom: '0.5rem' }}>
-                Secure Checkout
-              </h2>
+          <form onSubmit={handlePaySubmit} className="card animate-fade-in" style={{ textAlign: 'left', padding: '2rem' }}>
+            <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color-light)', paddingBottom: '0.5rem' }}>
+              Review & Secure Checkout
+            </h2>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+            {/* Side-by-Side Layout Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '2rem' }} className="mobile-grid-stack">
+              
+              {/* Left Side: Payment Form */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <h3 style={{ fontSize: '1.1rem', marginTop: 0, marginBottom: '0.5rem' }}>Payment Method</h3>
+                
                 <div className="badge badge-secondary" style={{ padding: '0.5rem', fontSize: '0.8rem', justifyContent: 'center' }}>
-                  <ShieldCheck style={{ width: '1.1rem', marginRight: '0.25rem' }} /> Escrow Account active. Cash is held safely.
+                  <ShieldCheck style={{ width: '1.1rem', marginRight: '0.25rem' }} /> Escrow active. Card charged after approval.
                 </div>
 
                 {/* Cardholder Name */}
                 <div className="form-group">
                   <label className="form-label">Name on Card</label>
-                  <input
-                    type="text"
-                    value={cardName}
-                    onChange={e => setCardName(e.target.value)}
-                    required
-                    className="form-control"
-                  />
+                  <input type="text" value={cardName} onChange={e => setCardName(e.target.value)} required className="form-control" />
                 </div>
 
                 {/* Card Number */}
@@ -203,13 +200,7 @@ export const BookingFlow: React.FC<BookingFlowProps> = ({
                   <label className="form-label">Card Number</label>
                   <div className="input-icon-wrapper">
                     <CreditCard className="input-icon" />
-                    <input
-                      type="text"
-                      value={cardNumber}
-                      onChange={e => setCardNumber(e.target.value)}
-                      required
-                      className="form-control"
-                    />
+                    <input type="text" value={cardNumber} onChange={e => setCardNumber(e.target.value)} required className="form-control" />
                   </div>
                 </div>
 
@@ -217,62 +208,72 @@ export const BookingFlow: React.FC<BookingFlowProps> = ({
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div>
                     <label className="form-label">Expiry</label>
-                    <input
-                      type="text"
-                      value={cardExpiry}
-                      onChange={e => setCardExpiry(e.target.value)}
-                      required
-                      placeholder="MM/YY"
-                      className="form-control"
-                    />
+                    <input type="text" value={cardExpiry} onChange={e => setCardExpiry(e.target.value)} required placeholder="MM/YY" className="form-control" />
                   </div>
                   <div>
                     <label className="form-label">CVV</label>
-                    <input
-                      type="password"
-                      value={cardCvv}
-                      onChange={e => setCardCvv(e.target.value)}
-                      required
-                      placeholder="3 digits"
-                      className="form-control"
-                    />
+                    <input type="password" value={cardCvv} onChange={e => setCardCvv(e.target.value)} required placeholder="3 digits" className="form-control" />
                   </div>
                 </div>
               </div>
 
-              {/* Pricing breakdown details */}
-              <div style={{ backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', padding: '1.25rem', marginBottom: '2rem', border: '1px dashed var(--border-color)' }}>
-                <h4 style={{ margin: '0 0 0.75rem 0', borderBottom: '1px solid var(--border-color-light)', paddingBottom: '0.5rem' }}>Price Details</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.85rem' }}>
-                  <div className="flex justify-between" style={{ color: 'var(--text-secondary)' }}>
-                    <span>Rate details (₹{worker.hourlyRate} x {duration} hrs)</span>
-                    <span>₹{basePrice.toFixed(0)}</span>
+              {/* Right Side: Request Summary & Warning */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                
+                {/* Worker Approval Notice */}
+                <div className="badge badge-warning" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-start', textTransform: 'none', border: '1px solid var(--warning)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '0.95rem' }}>
+                    ⚠️ Worker Approval Required
                   </div>
-                  <div className="flex justify-between" style={{ color: 'var(--text-secondary)' }}>
-                    <span>Platform Insurance & Tech Fee</span>
-                    <span>₹{platformFee.toFixed(0)}</span>
-                  </div>
-                  <div className="flex justify-between" style={{ color: 'var(--text-secondary)' }}>
-                    <span>GST (18%)</span>
-                    <span>₹{taxes.toFixed(0)}</span>
-                  </div>
-                  <div className="flex justify-between" style={{ fontWeight: 'bold', fontSize: '1rem', borderTop: '1px solid var(--border-color-light)', paddingTop: '0.75rem', marginTop: '0.25rem', color: 'var(--text-primary)' }}>
-                    <span>Total Cost</span>
-                    <span>₹{totalAmount.toFixed(0)}</span>
+                  <span style={{ fontSize: '0.85rem', lineHeight: '1.4' }}>
+                    Your booking request will be sent to <b>{worker.name}</b> for review. Payment will only be authorized now and processed <i>after</i> the worker accepts your request.
+                  </span>
+                </div>
+
+                {/* Pricing Summary */}
+                <div className="card-flat" style={{ backgroundColor: 'var(--bg-secondary)', padding: '1.5rem', border: '1px dashed var(--border-color)', height: '100%' }}>
+                  <h4 style={{ margin: '0 0 1rem 0', borderBottom: '1px solid var(--border-color-light)', paddingBottom: '0.5rem' }}>Booking Summary</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.85rem' }}>
+                    <div className="flex justify-between">
+                      <span style={{ color: 'var(--text-muted)' }}>Date & Time</span>
+                      <span style={{ fontWeight: 600 }}>{selectedDate} @ {time}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span style={{ color: 'var(--text-muted)' }}>Location</span>
+                      <span style={{ fontWeight: 600 }}>{address.split(',')[0] || 'Selected Location'}</span>
+                    </div>
+                    <hr style={{ border: 'none', borderTop: '1px solid var(--border-color-light)', margin: '0.25rem 0' }} />
+                    <div className="flex justify-between" style={{ color: 'var(--text-secondary)' }}>
+                      <span>Rate (₹{worker.hourlyRate} x {duration} hrs)</span>
+                      <span>₹{basePrice.toFixed(0)}</span>
+                    </div>
+                    <div className="flex justify-between" style={{ color: 'var(--text-secondary)' }}>
+                      <span>Platform Fee</span>
+                      <span>₹{platformFee.toFixed(0)}</span>
+                    </div>
+                    <div className="flex justify-between" style={{ color: 'var(--text-secondary)' }}>
+                      <span>GST (18%)</span>
+                      <span>₹{taxes.toFixed(0)}</span>
+                    </div>
+                    <div className="flex justify-between" style={{ fontWeight: 800, fontSize: '1.1rem', borderTop: '1px solid var(--border-color-light)', paddingTop: '0.75rem', marginTop: '0.25rem', color: 'var(--text-primary)' }}>
+                      <span>Total Authorized</span>
+                      <span>₹{totalAmount.toFixed(0)}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <button type="button" onClick={() => setStep(1)} className="btn btn-outline" style={{ flexGrow: 1 }}>
-                  Back
-                </button>
-                <button type="submit" className="btn btn-primary" style={{ flexGrow: 2 }}>
-                  Pay & Authorize Booking
-                </button>
               </div>
-            </form>
-          </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+              <button type="button" onClick={() => setStep(1)} className="btn btn-outline" style={{ flexGrow: 1, maxWidth: '150px' }}>
+                Back
+              </button>
+              <button type="submit" className="btn btn-primary" style={{ flexGrow: 2 }}>
+                Request Booking & Authorize Payment
+              </button>
+            </div>
+          </form>
         )}
 
         {/* STEP 3: BOOKING CONFIRMED SUCCESS */}

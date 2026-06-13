@@ -163,7 +163,7 @@ function App() {
       date: '2026-06-06',
       time: 'Immediate Dispatch',
       duration: 2,
-      totalAmount: plumber.hourlyRate * 2 + 3.99,
+      totalAmount: Math.round(plumber.hourlyRate * 2 + 3.99),
       status: 'Ongoing',
       address: 'Current Geo-Location (GPS-tracked)'
     };
