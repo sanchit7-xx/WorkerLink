@@ -1,5 +1,5 @@
 import express from 'express';
-import mysql from 'mysql2/promise';
+import { createClient } from '@supabase/supabase-js';
 import cors from 'cors';
 import dotenv from 'dotenv';
 
@@ -11,93 +11,77 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-// Database connection pool
-let pool;
-try {
-  pool = mysql.createPool({
-    host: process.env.DB_HOST || '127.0.0.1',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'workerlink',
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-  });
-  console.log('Database pool created successfully.');
-} catch (error) {
-  console.error('Error creating database pool:', error);
-}
+// Supabase connection
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://bxcmsnuitwrwsaydwqns.supabase.co';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ4Y21zbnVpdHdyd3NheWR3cW5zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzMzUwNjIsImV4cCI6MjA5NjkxMTA2Mn0.KuQBw1a6GNOhPXS3SveDtQrEsGe-CDQxqYJfEZ2ZDo8';
 
-// Check database connection helper
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Check database connection
 async function checkConnection() {
   try {
-    const connection = await pool.getConnection();
-    console.log('Connected to MySQL database.');
-    connection.release();
+    const { data, error } = await supabase.from('users').select('id').limit(1);
+    if (error && error.code === 'PGRST205') {
+      console.log('⚠️  Connected to Supabase, but tables do not exist yet. Please run the SQL schema in Supabase SQL Editor.');
+    } else if (error) {
+      console.error('Database connection issue:', error.message);
+    } else {
+      console.log('✅ Connected to Supabase database successfully.');
+    }
   } catch (error) {
-    console.error('Database connection failed. Make sure MySQL is running and database "workerlink" exists. Error:', error.message);
+    console.error('Database connection failed:', error.message);
   }
 }
 checkConnection();
 
-// Helper to parse JSON fields safely
-const parseJsonField = (field) => {
-  if (!field) return [];
-  if (typeof field === 'object') return field;
-  try {
-    return JSON.parse(field);
-  } catch (e) {
-    return [];
-  }
-};
+function genderImg(gender) {
+  return gender === 'Male' ? '1506794778202-cad84cf45f1d' : '1544005313-94ddf0286df2';
+}
 
 // --- AUTH API ---
 app.post('/api/auth/register', async (req, res) => {
   const { id, name, email, phone, password, role } = req.body;
   try {
     // Check if email already exists
-    const [existing] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
-    if (existing.length > 0) {
+    const { data: existing } = await supabase.from('users').select('*').eq('email', email);
+    if (existing && existing.length > 0) {
       return res.status(400).json({ error: 'Email address already registered' });
     }
 
     const userId = id || `usr-${Date.now()}`;
-    await pool.query(
-      'INSERT INTO users (id, name, email, phone, password, role) VALUES (?, ?, ?, ?, ?, ?)',
-      [userId, name, email, phone, password, role || 'user']
-    );
+    const { error: insertError } = await supabase.from('users').insert({
+      id: userId, name, email, phone, password, role: role || 'user'
+    });
+    if (insertError) throw insertError;
 
     // If registered as worker, create worker profile entry
     if (role === 'worker') {
       const avatar = `https://images.unsplash.com/photo-${genderImg(req.body.gender || 'Female')}?w=150&auto=format&fit=crop&q=80`;
-      await pool.query(
-        `INSERT INTO workers (id, name, avatar, category, experience, rating, reviewsCount, distance, availability, hourlyRate, dailyRate, verified, phone, email, skills, certifications, bio, gender, age, locality, specialties, calendarSlots) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          userId,
-          name,
-          avatar,
-          req.body.category || 'Cleaner',
-          req.body.experience || 1,
-          5.0,
-          0,
-          2.0,
-          'Available',
-          req.body.hourlyRate || 150,
-          req.body.dailyRate || 1000,
-          0, // Not verified initially
-          phone,
-          email,
-          JSON.stringify(req.body.skills || ['General Help']),
-          JSON.stringify(req.body.certifications || ['Aadhar Verified']),
-          req.body.bio || 'Professional and hard-working.',
-          req.body.gender || 'Female',
-          req.body.age || 25,
-          req.body.locality || 'City Center',
-          JSON.stringify(req.body.specialties || ['General Service']),
-          JSON.stringify(['2026-06-08', '2026-06-09', '2026-06-10'])
-        ]
-      );
+      const { error: workerError } = await supabase.from('workers').insert({
+        id: userId,
+        name,
+        avatar,
+        category: req.body.category || 'Cleaner',
+        experience: req.body.experience || 1,
+        rating: 5.0,
+        reviewsCount: 0,
+        distance: 2.0,
+        availability: 'Available',
+        hourlyRate: req.body.hourlyRate || 150,
+        dailyRate: req.body.dailyRate || 1000,
+        verified: 0,
+        phone,
+        email,
+        skills: req.body.skills || ['General Help'],
+        certifications: req.body.certifications || ['Aadhar Verified'],
+        bio: req.body.bio || 'Professional and hard-working.',
+        gender: req.body.gender || 'Female',
+        age: req.body.age || 25,
+        locality: req.body.locality || 'City Center',
+        specialties: req.body.specialties || ['General Service'],
+        calendarSlots: ['2026-06-08', '2026-06-09', '2026-06-10']
+      });
+      if (workerError) throw workerError;
     }
 
     res.status(201).json({ message: 'Registration successful', user: { id: userId, name, email, role: role || 'user' } });
@@ -107,15 +91,12 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-function genderImg(gender) {
-  return gender === 'Male' ? '1506794778202-cad84cf45f1d' : '1544005313-94ddf0286df2';
-}
-
 app.post('/api/auth/login', async (req, res) => {
   const { email, password, role } = req.body;
   try {
-    const [rows] = await pool.query('SELECT * FROM users WHERE email = ? AND password = ?', [email, password]);
-    if (rows.length === 0) {
+    const { data: rows, error } = await supabase.from('users').select('*').eq('email', email).eq('password', password);
+    if (error) throw error;
+    if (!rows || rows.length === 0) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
@@ -134,14 +115,11 @@ app.post('/api/auth/login', async (req, res) => {
 // --- WORKER API ---
 app.get('/api/workers', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM workers');
-    const workers = rows.map(w => ({
+    const { data: rows, error } = await supabase.from('workers').select('*');
+    if (error) throw error;
+    const workers = (rows || []).map(w => ({
       ...w,
-      verified: !!w.verified,
-      skills: parseJsonField(w.skills),
-      certifications: parseJsonField(w.certifications),
-      specialties: parseJsonField(w.specialties),
-      calendarSlots: parseJsonField(w.calendarSlots)
+      verified: !!w.verified
     }));
     res.json(workers);
   } catch (error) {
@@ -152,20 +130,13 @@ app.get('/api/workers', async (req, res) => {
 
 app.get('/api/workers/:id', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM workers WHERE id = ?', [req.params.id]);
-    if (rows.length === 0) {
+    const { data: rows, error } = await supabase.from('workers').select('*').eq('id', req.params.id);
+    if (error) throw error;
+    if (!rows || rows.length === 0) {
       return res.status(404).json({ error: 'Worker not found' });
     }
     const w = rows[0];
-    const worker = {
-      ...w,
-      verified: !!w.verified,
-      skills: parseJsonField(w.skills),
-      certifications: parseJsonField(w.certifications),
-      specialties: parseJsonField(w.specialties),
-      calendarSlots: parseJsonField(w.calendarSlots)
-    };
-    res.json(worker);
+    res.json({ ...w, verified: !!w.verified });
   } catch (error) {
     console.error('Fetch worker details error:', error);
     res.status(500).json({ error: 'Database error occurred' });
@@ -175,7 +146,8 @@ app.get('/api/workers/:id', async (req, res) => {
 app.put('/api/workers/:id/verify', async (req, res) => {
   try {
     const { verified } = req.body;
-    await pool.query('UPDATE workers SET verified = ? WHERE id = ?', [verified ? 1 : 0, req.params.id]);
+    const { error } = await supabase.from('workers').update({ verified: verified ? 1 : 0 }).eq('id', req.params.id);
+    if (error) throw error;
     res.json({ success: true, message: 'Worker verification state updated.' });
   } catch (error) {
     console.error('Worker verification update error:', error);
@@ -186,26 +158,22 @@ app.put('/api/workers/:id/verify', async (req, res) => {
 // --- ADMIN API ---
 app.get('/api/admin/stats', async (req, res) => {
   try {
-    const [workersRows] = await pool.query('SELECT COUNT(*) as count FROM workers');
-    const totalWorkers = workersRows[0].count;
-    const [verifiedRows] = await pool.query('SELECT COUNT(*) as count FROM workers WHERE verified = 1');
-    const verifiedWorkers = verifiedRows[0].count;
+    const { data: allWorkers, error: e1 } = await supabase.from('workers').select('id, verified');
+    if (e1) throw e1;
+    const totalWorkers = allWorkers ? allWorkers.length : 0;
+    const verifiedWorkers = allWorkers ? allWorkers.filter(w => w.verified === 1).length : 0;
     const verifiedRate = totalWorkers > 0 ? Math.round((verifiedWorkers / totalWorkers) * 100) : 0;
-    
-    const [bookingsRows] = await pool.query('SELECT COUNT(*) as count, SUM(totalAmount) as volume FROM bookings');
-    const bookingsCount = bookingsRows[0].count;
-    const bookingsVolume = bookingsRows[0].volume || 0;
-    
-    const [complaintsRows] = await pool.query('SELECT COUNT(*) as count FROM complaints WHERE status != "Resolved"');
-    const openDisputes = complaintsRows[0].count;
-    
-    res.json({
-      totalWorkers,
-      verifiedRate,
-      bookingsCount,
-      bookingsVolume,
-      openDisputes
-    });
+
+    const { data: allBookings, error: e2 } = await supabase.from('bookings').select('id, totalAmount');
+    if (e2) throw e2;
+    const bookingsCount = allBookings ? allBookings.length : 0;
+    const bookingsVolume = allBookings ? allBookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0) : 0;
+
+    const { data: openComplaints, error: e3 } = await supabase.from('complaints').select('id').neq('status', 'Resolved');
+    if (e3) throw e3;
+    const openDisputes = openComplaints ? openComplaints.length : 0;
+
+    res.json({ totalWorkers, verifiedRate, bookingsCount, bookingsVolume, openDisputes });
   } catch (error) {
     console.error('Admin stats error:', error);
     res.status(500).json({ error: 'Database error' });
@@ -214,9 +182,9 @@ app.get('/api/admin/stats', async (req, res) => {
 
 app.get('/api/workers/unverified', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT id, name, category, experience FROM workers WHERE verified = 0');
-    // Map to the shape expected by AdminDashboard for pending verifications
-    const unverified = rows.map(r => ({
+    const { data: rows, error } = await supabase.from('workers').select('id, name, category, experience').eq('verified', 0);
+    if (error) throw error;
+    const unverified = (rows || []).map(r => ({
       id: r.id,
       name: r.name,
       category: r.category,
@@ -235,8 +203,9 @@ app.get('/api/workers/unverified', async (req, res) => {
 // --- BOOKINGS API ---
 app.get('/api/bookings', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM bookings ORDER BY date DESC');
-    res.json(rows);
+    const { data: rows, error } = await supabase.from('bookings').select('*').order('date', { ascending: false });
+    if (error) throw error;
+    res.json(rows || []);
   } catch (error) {
     console.error('Fetch all bookings error:', error);
     res.status(500).json({ error: 'Database error' });
@@ -245,8 +214,9 @@ app.get('/api/bookings', async (req, res) => {
 
 app.get('/api/bookings/user/:userId', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM bookings WHERE userId = ? ORDER BY date DESC', [req.params.userId]);
-    res.json(rows);
+    const { data: rows, error } = await supabase.from('bookings').select('*').eq('userId', req.params.userId).order('date', { ascending: false });
+    if (error) throw error;
+    res.json(rows || []);
   } catch (error) {
     console.error('Fetch user bookings error:', error);
     res.status(500).json({ error: 'Database error' });
@@ -255,8 +225,9 @@ app.get('/api/bookings/user/:userId', async (req, res) => {
 
 app.get('/api/bookings/worker/:workerId', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM bookings WHERE workerId = ? ORDER BY date DESC', [req.params.workerId]);
-    res.json(rows);
+    const { data: rows, error } = await supabase.from('bookings').select('*').eq('workerId', req.params.workerId).order('date', { ascending: false });
+    if (error) throw error;
+    res.json(rows || []);
   } catch (error) {
     console.error('Fetch worker bookings error:', error);
     res.status(500).json({ error: 'Database error' });
@@ -267,11 +238,11 @@ app.post('/api/bookings', async (req, res) => {
   const { id, userId, workerId, workerName, workerCategory, workerAvatar, date, time, duration, totalAmount, status, address } = req.body;
   try {
     const bookingId = id || `bk-${Date.now()}`;
-    await pool.query(
-      `INSERT INTO bookings (id, userId, workerId, workerName, workerCategory, workerAvatar, date, time, duration, totalAmount, status, address)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [bookingId, userId, workerId, workerName, workerCategory, workerAvatar, date, time, duration, totalAmount, status || 'Pending', address]
-    );
+    const { error } = await supabase.from('bookings').insert({
+      id: bookingId, userId, workerId, workerName, workerCategory, workerAvatar,
+      date, time, duration, totalAmount, status: status || 'Pending', address
+    });
+    if (error) throw error;
     res.status(201).json({ message: 'Booking created successfully', bookingId });
   } catch (error) {
     console.error('Create booking error:', error);
@@ -282,7 +253,8 @@ app.post('/api/bookings', async (req, res) => {
 app.put('/api/bookings/:id/status', async (req, res) => {
   const { status } = req.body;
   try {
-    await pool.query('UPDATE bookings SET status = ? WHERE id = ?', [status, req.params.id]);
+    const { error } = await supabase.from('bookings').update({ status }).eq('id', req.params.id);
+    if (error) throw error;
     res.json({ message: 'Booking status updated successfully' });
   } catch (error) {
     console.error('Update booking status error:', error);
@@ -293,8 +265,9 @@ app.put('/api/bookings/:id/status', async (req, res) => {
 // --- COMPLAINTS API ---
 app.get('/api/complaints', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM complaints ORDER BY date DESC');
-    res.json(rows);
+    const { data: rows, error } = await supabase.from('complaints').select('*').order('date', { ascending: false });
+    if (error) throw error;
+    res.json(rows || []);
   } catch (error) {
     console.error('Fetch complaints error:', error);
     res.status(500).json({ error: 'Database error' });
@@ -306,11 +279,11 @@ app.post('/api/complaints', async (req, res) => {
   try {
     const complaintId = id || `comp-${Date.now()}`;
     const tId = ticketId || `WLAI-${Math.floor(1000 + Math.random() * 9000)}`;
-    await pool.query(
-      `INSERT INTO complaints (id, ticketId, userType, reporterName, subject, description, date, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [complaintId, tId, userType, reporterName, subject, description, date, status || 'Open']
-    );
+    const { error } = await supabase.from('complaints').insert({
+      id: complaintId, ticketId: tId, userType, reporterName, subject, description,
+      date, status: status || 'Open'
+    });
+    if (error) throw error;
     res.status(201).json({ message: 'Complaint filed successfully', ticketId: tId });
   } catch (error) {
     console.error('Create complaint error:', error);
@@ -321,7 +294,8 @@ app.post('/api/complaints', async (req, res) => {
 app.put('/api/complaints/:id/status', async (req, res) => {
   const { status } = req.body;
   try {
-    await pool.query('UPDATE complaints SET status = ? WHERE id = ?', [status, req.params.id]);
+    const { error } = await supabase.from('complaints').update({ status }).eq('id', req.params.id);
+    if (error) throw error;
     res.json({ message: 'Complaint status updated' });
   } catch (error) {
     console.error('Update complaint status error:', error);
@@ -332,8 +306,9 @@ app.put('/api/complaints/:id/status', async (req, res) => {
 // --- REVIEWS API ---
 app.get('/api/reviews/worker/:workerId', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM reviews WHERE workerId = ? ORDER BY date DESC', [req.params.workerId]);
-    res.json(rows);
+    const { data: rows, error } = await supabase.from('reviews').select('*').eq('workerId', req.params.workerId).order('date', { ascending: false });
+    if (error) throw error;
+    res.json(rows || []);
   } catch (error) {
     console.error('Fetch reviews error:', error);
     res.status(500).json({ error: 'Database error' });
@@ -344,20 +319,20 @@ app.post('/api/reviews', async (req, res) => {
   const { id, workerId, userName, rating, date, comment } = req.body;
   try {
     const reviewId = id || `rev-${Date.now()}`;
-    await pool.query(
-      'INSERT INTO reviews (id, workerId, userName, rating, date, comment) VALUES (?, ?, ?, ?, ?, ?)',
-      [reviewId, workerId, userName, rating, date, comment]
-    );
+    const { error } = await supabase.from('reviews').insert({
+      id: reviewId, workerId, userName, rating, date, comment
+    });
+    if (error) throw error;
 
     // Update worker average rating and review count
-    const [reviews] = await pool.query('SELECT rating FROM reviews WHERE workerId = ?', [workerId]);
-    const reviewsCount = reviews.length;
-    const avgRating = reviews.reduce((sum, r) => sum + r.rating, 0) / reviewsCount;
+    const { data: reviews } = await supabase.from('reviews').select('rating').eq('workerId', workerId);
+    const reviewsCount = reviews ? reviews.length : 0;
+    const avgRating = reviews ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviewsCount : 0;
 
-    await pool.query(
-      'UPDATE workers SET rating = ?, reviewsCount = ? WHERE id = ?',
-      [parseFloat(avgRating.toFixed(1)), reviewsCount, workerId]
-    );
+    await supabase.from('workers').update({
+      rating: parseFloat(avgRating.toFixed(1)),
+      reviewsCount
+    }).eq('id', workerId);
 
     res.status(201).json({ message: 'Review added successfully' });
   } catch (error) {

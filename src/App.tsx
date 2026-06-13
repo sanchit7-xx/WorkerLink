@@ -388,10 +388,14 @@ function App() {
 
           {/* Nav Links (Desktop) */}
           <nav className="desktop-only flex align-center" style={{ gap: '1.5rem' }}>
-            <span onClick={() => setActivePage('landing')} style={{ cursor: 'pointer', fontWeight: activePage === 'landing' ? 700 : 500, color: activePage === 'landing' ? 'var(--primary)' : 'var(--text-secondary)' }}>Home</span>
-            <span onClick={() => { setCategoryFilter(''); setActivePage('listing'); }} style={{ cursor: 'pointer', fontWeight: activePage === 'listing' ? 700 : 500, color: activePage === 'listing' ? 'var(--primary)' : 'var(--text-secondary)' }}>Browse Workers</span>
-            <span onClick={() => setActivePage('elderly')} style={{ cursor: 'pointer', fontWeight: activePage === 'elderly' ? 700 : 500, color: activePage === 'elderly' ? 'var(--primary)' : 'var(--text-secondary)' }}>Elderly Care</span>
-            <span onClick={() => setActivePage('babysitting')} style={{ cursor: 'pointer', fontWeight: activePage === 'babysitting' ? 700 : 500, color: activePage === 'babysitting' ? 'var(--primary)' : 'var(--text-secondary)' }}>Childcare</span>
+            {userRole !== 'worker' && (
+              <>
+                <span onClick={() => setActivePage('landing')} style={{ cursor: 'pointer', fontWeight: activePage === 'landing' ? 700 : 500, color: activePage === 'landing' ? 'var(--primary)' : 'var(--text-secondary)' }}>Home</span>
+                <span onClick={() => { setCategoryFilter(''); setActivePage('listing'); }} style={{ cursor: 'pointer', fontWeight: activePage === 'listing' ? 700 : 500, color: activePage === 'listing' ? 'var(--primary)' : 'var(--text-secondary)' }}>Browse Workers</span>
+                <span onClick={() => setActivePage('elderly')} style={{ cursor: 'pointer', fontWeight: activePage === 'elderly' ? 700 : 500, color: activePage === 'elderly' ? 'var(--primary)' : 'var(--text-secondary)' }}>Elderly Care</span>
+                <span onClick={() => setActivePage('babysitting')} style={{ cursor: 'pointer', fontWeight: activePage === 'babysitting' ? 700 : 500, color: activePage === 'babysitting' ? 'var(--primary)' : 'var(--text-secondary)' }}>Childcare</span>
+              </>
+            )}
             {userRole === 'worker' && <span onClick={() => setActivePage('worker-dashboard')} style={{ cursor: 'pointer', fontWeight: activePage === 'worker-dashboard' ? 700 : 500, color: 'var(--secondary)' }}>Worker Portal</span>}
             {userRole === 'admin' && <span onClick={() => setActivePage('admin-dashboard')} style={{ cursor: 'pointer', fontWeight: activePage === 'admin-dashboard' ? 700 : 500, color: 'var(--danger-light)' }}>Admin Desk</span>}
           </nav>
@@ -485,43 +489,47 @@ function App() {
         backgroundColor: 'var(--bg-primary)', borderTop: '1px solid var(--border-color)',
         boxShadow: '0 -4px 12px rgba(0,0,0,0.05)', display: 'none', zIndex: 900
       }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', height: '100%', width: '100%' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: userRole === 'worker' ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)', height: '100%', width: '100%' }}>
           
-          <button 
-            onClick={() => setActivePage('landing')}
-            className={`mobile-nav-btn ${activePage === 'landing' ? 'active' : ''}`}
-            style={{
-              background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', 
-              alignItems: 'center', justifyContent: 'center', gap: '0.15rem', color: activePage === 'landing' ? 'var(--primary)' : 'var(--text-secondary)'
-            }}
-          >
-            <Home style={{ width: '1.2rem', height: '1.2rem' }} />
-            <span style={{ fontSize: '0.65rem', fontWeight: 600 }}>Home</span>
-          </button>
+          {userRole !== 'worker' && (
+            <>
+              <button 
+                onClick={() => setActivePage('landing')}
+                className={`mobile-nav-btn ${activePage === 'landing' ? 'active' : ''}`}
+                style={{
+                  background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', 
+                  alignItems: 'center', justifyContent: 'center', gap: '0.15rem', color: activePage === 'landing' ? 'var(--primary)' : 'var(--text-secondary)'
+                }}
+              >
+                <Home style={{ width: '1.2rem', height: '1.2rem' }} />
+                <span style={{ fontSize: '0.65rem', fontWeight: 600 }}>Home</span>
+              </button>
 
-          <button 
-            onClick={() => { setCategoryFilter(''); setActivePage('listing'); }}
-            className={`mobile-nav-btn ${activePage === 'listing' ? 'active' : ''}`}
-            style={{
-              background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', 
-              alignItems: 'center', justifyContent: 'center', gap: '0.15rem', color: activePage === 'listing' ? 'var(--primary)' : 'var(--text-secondary)'
-            }}
-          >
-            <Search style={{ width: '1.2rem', height: '1.2rem' }} />
-            <span style={{ fontSize: '0.65rem', fontWeight: 600 }}>Browse</span>
-          </button>
+              <button 
+                onClick={() => { setCategoryFilter(''); setActivePage('listing'); }}
+                className={`mobile-nav-btn ${activePage === 'listing' ? 'active' : ''}`}
+                style={{
+                  background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', 
+                  alignItems: 'center', justifyContent: 'center', gap: '0.15rem', color: activePage === 'listing' ? 'var(--primary)' : 'var(--text-secondary)'
+                }}
+              >
+                <Search style={{ width: '1.2rem', height: '1.2rem' }} />
+                <span style={{ fontSize: '0.65rem', fontWeight: 600 }}>Browse</span>
+              </button>
 
-          <button 
-            onClick={() => setActivePage(userRole === 'guest' ? 'auth' : 'dashboard')}
-            className={`mobile-nav-btn ${activePage === 'dashboard' ? 'active' : ''}`}
-            style={{
-              background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', 
-              alignItems: 'center', justifyContent: 'center', gap: '0.15rem', color: activePage === 'dashboard' ? 'var(--primary)' : 'var(--text-secondary)'
-            }}
-          >
-            <MessageSquare style={{ width: '1.2rem', height: '1.2rem' }} />
-            <span style={{ fontSize: '0.65rem', fontWeight: 600 }}>Portal</span>
-          </button>
+              <button 
+                onClick={() => setActivePage(userRole === 'guest' ? 'auth' : 'dashboard')}
+                className={`mobile-nav-btn ${activePage === 'dashboard' ? 'active' : ''}`}
+                style={{
+                  background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', 
+                  alignItems: 'center', justifyContent: 'center', gap: '0.15rem', color: activePage === 'dashboard' ? 'var(--primary)' : 'var(--text-secondary)'
+                }}
+              >
+                <MessageSquare style={{ width: '1.2rem', height: '1.2rem' }} />
+                <span style={{ fontSize: '0.65rem', fontWeight: 600 }}>Portal</span>
+              </button>
+            </>
+          )}
 
           <button 
             onClick={() => {
